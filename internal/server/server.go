@@ -12,12 +12,12 @@ import (
 
 type Server struct {
 	HttpServer *http.Server
-	Task       map[string]*entity.Task
+	Task       map[int]*entity.Task
 	lg         *slog.Logger
 }
 
 func New(addr string, logger *slog.Logger) *Server {
-	m := make(map[string]*entity.Task)
+	m := make(map[int]*entity.Task)
 	s := &Server{
 		Task: m,
 		lg:   logger,
@@ -27,6 +27,8 @@ func New(addr string, logger *slog.Logger) *Server {
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			r.Post("/task", s.HandleCreateTask)
+			r.Post("/lint/{id}", s.HandleCreateLink)
+			r.Get("/status/{id}", s.HandleGetStatus)
 		})
 	})
 	s.HttpServer = &http.Server{
