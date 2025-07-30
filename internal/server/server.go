@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/AndreySirin/04.08/internal/client"
 	"github.com/AndreySirin/04.08/internal/entity"
 	"github.com/go-chi/chi/v5"
 	"log/slog"
@@ -14,13 +15,16 @@ type Server struct {
 	HttpServer *http.Server
 	Task       map[int]*entity.Task
 	lg         *slog.Logger
+	client     *http.Client
 }
 
 func New(addr string, logger *slog.Logger) *Server {
 	m := make(map[int]*entity.Task)
+	cl := client.New()
 	s := &Server{
-		Task: m,
-		lg:   logger,
+		Task:   m,
+		lg:     logger,
+		client: cl,
 	}
 
 	r := chi.NewRouter()

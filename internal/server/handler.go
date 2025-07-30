@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/AndreySirin/04.08/internal/archive"
+	"github.com/AndreySirin/04.08/internal/client"
 	"github.com/AndreySirin/04.08/internal/entity"
 	"github.com/go-chi/chi/v5"
 	"net/http"
@@ -72,8 +74,32 @@ func (s *Server) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(s.Task[id].Status)
 	} else {
+		writer, file, errorZip := archive.CreateZip(taskId)
+		defer file.Close()
+		defer writer.Close()
+		if errorZip != nil {
+			http.Error(w, errorZip.Error(), http.StatusBadRequest)
+			return
+		}
+		for i := 0; i < 3; i++ {
+			body, errLoad := client.LoadFile(s.Task[id].Link[i], s.client)
+			if errLoad != nil {
+				http.Error(w, errLoad.Error(), http.StatusBadRequest)
+				return
+			}
+			// проверка content-type
+			err = archive.WriteZip(writer, body, s.Task[id].Link[i])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode("надо загружать и архивировать")
+		err = json.NewEncoder(w).Encode("надо загружать и архивировать")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 }
