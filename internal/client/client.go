@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -16,17 +17,27 @@ func New() *http.Client {
 func LoadFile(url string, client *http.Client) ([]byte, error) {
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("Error executing request: %v", err)
+		return nil, fmt.Errorf("failed to fetch %s: %w", url, err)
 	}
-	defer response.Body.Close()
+	defer func() {
+		err = response.Body.Close()
+		if err != nil {
+			log.Printf("failed to close response body: %v", err)
+			return
+		}
+	}()
 
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Error reading response body: %v", err)
+	content := response.Header.Get("Content-Type")
+	if content == "application/pdf" || content == "image/jpeg" {
+		body, errRead := io.ReadAll(response.Body)
+		if errRead != nil {
+			return nil, fmt.Errorf("error reading response body: %v", errRead)
+		}
+		return body, nil
 	}
-	return body, nil
+	return nil, fmt.Errorf("unexpected content type: %s", content)
 }

@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/AndreySirin/04.08/internal/archive"
 	"github.com/AndreySirin/04.08/internal/server"
+	"github.com/AndreySirin/04.08/internal/zip"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -14,7 +14,7 @@ const port = ":8080"
 
 func main() {
 	lg := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	err := archive.InitDir()
+	err := zip.InitDir()
 	if err != nil {
 		lg.Error("error creating archives directory")
 	}

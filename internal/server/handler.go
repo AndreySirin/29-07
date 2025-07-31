@@ -2,17 +2,19 @@ package server
 
 import (
 	"encoding/json"
-	"github.com/AndreySirin/04.08/internal/archive"
+	"fmt"
 	"github.com/AndreySirin/04.08/internal/client"
 	"github.com/AndreySirin/04.08/internal/entity"
+	"github.com/AndreySirin/04.08/internal/zip"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strconv"
 )
 
 const (
-	statusWaiting = "waiting"
-	statusload    = "loading"
+	statusCreated   = "created"
+	statusLoad      = "loading"
+	statusCompleted = "completed"
 )
 
 func (s *Server) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
@@ -26,14 +28,29 @@ func (s *Server) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var slise []string
-	s.Task[id] = &entity.Task{
-		Link:   slise,
-		Status: statusWaiting,
+	select {
+	case s.ch <- task:
+		var links []string
+		s.Task[id] = &entity.Task{
+			Link:   links,
+			Status: statusCreated,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		err = json.NewEncoder(w).Encode(s.Task)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		err = json.NewEncoder(w).Encode("the server is currently busy")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(s.Task)
 }
 
 func (s *Server) HandleCreateLink(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +67,7 @@ func (s *Server) HandleCreateLink(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(s.Task[id].Link) == 2 {
 		s.Task[id].Link = append(s.Task[id].Link, url)
-		s.Task[id].Status = statusload
+		s.Task[id].Status = statusLoad
 
 	} else if len(s.Task[id].Link) < 3 {
 		s.Task[id].Link = append(s.Task[id].Link, url)
@@ -69,36 +86,66 @@ func (s *Server) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if s.Task[id].Status != statusload {
+	if s.Task[id].Status == statusCreated {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(s.Task[id].Status)
-	} else {
-		writer, file, errorZip := archive.CreateZip(taskId)
-		defer file.Close()
-		defer writer.Close()
-		if errorZip != nil {
-			http.Error(w, errorZip.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(s.Task[id].Status)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+	} else if s.Task[id].Status == statusLoad {
+		writer, file, errorZip := zip.CreateZip(taskId)
+		if errorZip != nil {
+			http.Error(w, errorZip.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		defer func() {
+			err = file.Close()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}()
+
+		defer func() {
+			err = writer.Close()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}()
+
 		for i := 0; i < 3; i++ {
 			body, errLoad := client.LoadFile(s.Task[id].Link[i], s.client)
 			if errLoad != nil {
-				http.Error(w, errLoad.Error(), http.StatusBadRequest)
-				return
+				s.Task[id].Err[s.Task[id].Link[i]] = errLoad
+				s.lg.Error("error when uploading a file from a link", s.Task[id].Link[i])
+				continue
 			}
-			// проверка content-type
-			err = archive.WriteZip(writer, body, s.Task[id].Link[i])
+			err = zip.WriteZip(writer, body, s.Task[id].Link[i])
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
+				s.lg.Error("error when writing to the zip", err)
+				continue
 			}
 		}
-
+		linkZip := fmt.Sprintf("http://localhost:8080/archives/%s.zip", taskId)
+		s.Task[id].ArchiveUrl = linkZip
+		s.Task[id].Status = statusCompleted
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode("надо загружать и архивировать")
+		err = json.NewEncoder(w).Encode(s.Task[id])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		<-s.ch
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		err = json.NewEncoder(w).Encode("the server has already completed this task")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}

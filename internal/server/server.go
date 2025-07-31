@@ -14,24 +14,27 @@ import (
 type Server struct {
 	HttpServer *http.Server
 	Task       map[int]*entity.Task
+	ch         chan string
 	lg         *slog.Logger
 	client     *http.Client
 }
 
 func New(addr string, logger *slog.Logger) *Server {
 	m := make(map[int]*entity.Task)
+	ch := make(chan string, 3)
 	cl := client.New()
 	s := &Server{
 		Task:   m,
 		lg:     logger,
 		client: cl,
+		ch:     ch,
 	}
 
 	r := chi.NewRouter()
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
-			r.Post("/task", s.HandleCreateTask)
-			r.Post("/lint/{id}", s.HandleCreateLink)
+			r.Post("/tasks", s.HandleCreateTask)
+			r.Post("/links/{id}", s.HandleCreateLink)
 			r.Get("/status/{id}", s.HandleGetStatus)
 		})
 	})
