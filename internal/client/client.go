@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func LoadFile(url string, client *http.Client) ([]byte, error) {
 	}()
 
 	content := response.Header.Get("Content-Type")
-	if content == "application/pdf" || content == "image/jpeg" {
+	if strings.HasPrefix(content, "application/pdf") || strings.HasPrefix(content, "image/jpeg") {
 		body, errRead := io.ReadAll(response.Body)
 		if errRead != nil {
 			return nil, fmt.Errorf("error reading response body: %v", errRead)

@@ -4,5 +4,5 @@ type Task struct {
 	Link       []string
 	Status     string
 	ArchiveUrl string
-	Err        map[string]error
+	ErrorLoad  map[string]string
 }

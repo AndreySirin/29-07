@@ -7,6 +7,7 @@ import (
 	"github.com/AndreySirin/04.08/internal/entity"
 	"github.com/AndreySirin/04.08/internal/zip"
 	"github.com/go-chi/chi/v5"
+	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -31,9 +32,11 @@ func (s *Server) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
 	select {
 	case s.ch <- task:
 		var links []string
+		er := make(map[string]string)
 		s.Task[id] = &entity.Task{
-			Link:   links,
-			Status: statusCreated,
+			Link:      links,
+			Status:    statusCreated,
+			ErrorLoad: er,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -121,8 +124,8 @@ func (s *Server) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 		for i := 0; i < 3; i++ {
 			body, errLoad := client.LoadFile(s.Task[id].Link[i], s.client)
 			if errLoad != nil {
-				s.Task[id].Err[s.Task[id].Link[i]] = errLoad
-				s.lg.Error("error when uploading a file from a link", s.Task[id].Link[i])
+				s.Task[id].ErrorLoad[s.Task[id].Link[i]] = errLoad.Error()
+				s.lg.Error("error when uploading a file from a link", slog.String("url", s.Task[id].Link[i]))
 				continue
 			}
 			err = zip.WriteZip(writer, body, s.Task[id].Link[i])
