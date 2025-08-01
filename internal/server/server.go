@@ -31,6 +31,10 @@ func New(addr string, logger *slog.Logger) *Server {
 	}
 
 	r := chi.NewRouter()
+	r.Get("/archives/*", func(w http.ResponseWriter, r *http.Request) {
+		fs := http.StripPrefix("/archives/", http.FileServer(http.Dir("archives")))
+		fs.ServeHTTP(w, r)
+	})
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			r.Post("/tasks", s.HandleCreateTask)

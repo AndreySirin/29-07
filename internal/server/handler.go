@@ -7,7 +7,6 @@ import (
 	"github.com/AndreySirin/04.08/internal/entity"
 	"github.com/AndreySirin/04.08/internal/zip"
 	"github.com/go-chi/chi/v5"
-	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -125,7 +124,7 @@ func (s *Server) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 			body, errLoad := client.LoadFile(s.Task[id].Link[i], s.client)
 			if errLoad != nil {
 				s.Task[id].ErrorLoad[s.Task[id].Link[i]] = errLoad.Error()
-				s.lg.Error("error when uploading a file from a link", slog.String("url", s.Task[id].Link[i]))
+				s.lg.Error("error when uploading a file from a link:", errLoad, "url:", s.Task[id].Link[i])
 				continue
 			}
 			err = zip.WriteZip(writer, body, s.Task[id].Link[i])
