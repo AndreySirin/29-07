@@ -49,10 +49,10 @@ func New(addr string, logger *slog.Logger) *Server {
 	return s
 }
 func (s *Server) Run() {
-	s.lg.Info("запуск сервера")
+	s.lg.Info("server is running")
 	err := s.HttpServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
-		s.lg.Info("остановка сервера")
+		s.lg.Info("server is stopped")
 		return
 	}
 }
@@ -62,7 +62,7 @@ func (s *Server) ShutDown() {
 	defer cancel()
 	err := s.HttpServer.Shutdown(ctx)
 	if err != nil {
-		s.lg.Error("ошибка при остановки сервера")
+		s.lg.Error("error when stopping the server")
 		return
 	}
 }
